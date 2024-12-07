@@ -46,7 +46,7 @@ const settings = definePluginSettings({
 export default definePlugin({
     name: "Auto Delete Messages",
     description: "Auto delete messages after a certain time with guild or channel filter. If the message is edited or deleted before the time, it won't be deleted.",
-    authors: [{ name: "diezou", id: 1234567890n }],
+    authors: [{ name: "diezou", id: 481850711072571393n }],
 
     settings,
 
