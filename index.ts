@@ -15,7 +15,8 @@ const MessageCreator = findByPropsLazy("createMessage", "sendMessage");
 const settings = definePluginSettings({
     secondsDelay: {
         type: OptionType.SELECT,
-        description: "Default time in seconds before messages are automatically deleted",
+        description:
+            "Default time in seconds before messages are automatically deleted",
         options: [
             { value: 1, label: "1" },
             { value: 5, label: "5" },
@@ -54,7 +55,7 @@ export default definePlugin({
     settings,
 
     start() {
-        this.onMessage = e => {
+        this.onMessage = (e) => {
             // Check if the message is from the current user, is optimistic, or is sending to get only the messages that are really sent by the current user and not just created
             if (
                 !e.message ||
@@ -70,11 +71,11 @@ export default definePlugin({
                 ? settings.store.secondsDelay * 1000
                 : 10000;
             // Parse settings to get the guild or channel IDs and their respective delays
-            const parseSettings = ids =>
-                ids?.split(",").map(pair => {
+            const parseSettings = (ids) =>
+                ids?.split(",").map((pair) => {
                     const [id, delay] = pair
                         .split(":")
-                        .map(item => item.trim());
+                        .map((item) => item.trim());
                     return {
                         id,
                         delay: delay ? parseInt(delay) * 1000 : delaySettings,
@@ -86,8 +87,8 @@ export default definePlugin({
             const channelSettings = parseSettings(settings.store.channelIds);
 
             // Get the guild and channel IDs from the settings
-            const guildIds = guildSettings.map(setting => setting.id);
-            const channelIds = channelSettings.map(setting => setting.id);
+            const guildIds = guildSettings.map((setting) => setting.id);
+            const channelIds = channelSettings.map((setting) => setting.id);
 
             // Check if the message is from a guild or channel that is in the settings
             if (
@@ -103,13 +104,13 @@ export default definePlugin({
             // If the message is from a channel not in a guild, use the channel delay if it exists, otherwise use the default delay
             const delay = channelIds.includes(e.message.channel_id)
                 ? channelSettings.find(
-                    setting => setting.id === e.message.channel_id
-                )?.delay
+                      (setting) => setting.id === e.message.channel_id
+                  )?.delay
                 : guildIds.includes(e.message.guild_id)
-                    ? guildSettings.find(
-                        setting => setting.id === e.message.guild_id
-                    )?.delay
-                    : delaySettings;
+                ? guildSettings.find(
+                      (setting) => setting.id === e.message.guild_id
+                  )?.delay
+                : delaySettings;
 
             // Delete the message after the delay
             setTimeout(() => {
