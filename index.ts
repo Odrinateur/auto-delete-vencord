@@ -15,7 +15,7 @@ const MessageCreator = findByPropsLazy("createMessage", "sendMessage");
 const settings = definePluginSettings({
     secondsDelay: {
         type: OptionType.SELECT,
-        description: "Enable delete on click while holding backspace",
+        description: "Default time in seconds before messages are automatically deleted",
         options: [
             { value: 1, label: "1" },
             { value: 5, label: "5" },
@@ -36,25 +36,25 @@ const settings = definePluginSettings({
     guildIds: {
         type: OptionType.STRING,
         description:
-            "Guild IDs to enable auto delete. You have to separate the guild ID and the delay with a colon, and separate each pair with a comma. Example: '1234567890:10,0987654321:5,5432109876'. If you don't specify a delay, it will use the default delay.",
+            "Configure auto-delete for specific servers. Format: 'serverID:seconds,serverID:seconds'. Example: '123456:10,789012:5'. The default delay will be used if no seconds are specified.",
     },
     channelIds: {
         type: OptionType.STRING,
         description:
-            "Channel IDs to enable auto delete. You have to separate the channel ID and the delay with a colon, and separate each pair with a comma. Example: '1234567890:10,0987654321:5,5432109876'. If you don't specify a delay, it will use the default delay.",
+            "Configure auto-delete for specific channels. Format: 'channelID:seconds,channelID:seconds'. Example: '123456:10,789012:5'. The default delay will be used if no seconds are specified.",
     },
 });
 
 export default definePlugin({
     name: "AutoDeleteMessages",
     description:
-        "Auto delete messages after a certain time with guild or channel filter. If the message is edited or deleted before the time, it won't be deleted.",
+        "Automatically deletes your messages after a specified delay in configured servers and channels only.",
     authors: [{ name: "diezou", id: 481850711072571393n }],
 
     settings,
 
     start() {
-        this.onMessage = (e) => {
+        this.onMessage = e => {
             // Check if the message is from the current user, is optimistic, or is sending to get only the messages that are really sent by the current user and not just created
             if (
                 !e.message ||
@@ -70,11 +70,11 @@ export default definePlugin({
                 ? settings.store.secondsDelay * 1000
                 : 10000;
             // Parse settings to get the guild or channel IDs and their respective delays
-            const parseSettings = (ids) =>
-                ids?.split(",").map((pair) => {
+            const parseSettings = ids =>
+                ids?.split(",").map(pair => {
                     const [id, delay] = pair
                         .split(":")
-                        .map((item) => item.trim());
+                        .map(item => item.trim());
                     return {
                         id,
                         delay: delay ? parseInt(delay) * 1000 : delaySettings,
@@ -86,8 +86,8 @@ export default definePlugin({
             const channelSettings = parseSettings(settings.store.channelIds);
 
             // Get the guild and channel IDs from the settings
-            const guildIds = guildSettings.map((setting) => setting.id);
-            const channelIds = channelSettings.map((setting) => setting.id);
+            const guildIds = guildSettings.map(setting => setting.id);
+            const channelIds = channelSettings.map(setting => setting.id);
 
             // Check if the message is from a guild or channel that is in the settings
             if (
@@ -103,13 +103,13 @@ export default definePlugin({
             // If the message is from a channel not in a guild, use the channel delay if it exists, otherwise use the default delay
             const delay = channelIds.includes(e.message.channel_id)
                 ? channelSettings.find(
-                      (setting) => setting.id === e.message.channel_id
-                  )?.delay
+                    setting => setting.id === e.message.channel_id
+                )?.delay
                 : guildIds.includes(e.message.guild_id)
-                ? guildSettings.find(
-                      (setting) => setting.id === e.message.guild_id
-                  )?.delay
-                : delaySettings;
+                    ? guildSettings.find(
+                        setting => setting.id === e.message.guild_id
+                    )?.delay
+                    : delaySettings;
 
             // Delete the message after the delay
             setTimeout(() => {
