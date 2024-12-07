@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { addPreSendListener, removeClickListener } from "@api/MessageEvents";
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { MessageStore, UserStore } from "@webpack/common";
+import { FluxDispatcher, UserStore } from "@webpack/common";
 
 const MessageActions = findByPropsLazy("deleteMessage", "editMessage");
+const MessageCreator = findByPropsLazy("createMessage", "sendMessage");
 
 const settings = definePluginSettings({
     secondsDelay: {
@@ -46,7 +46,7 @@ const settings = definePluginSettings({
 });
 
 export default definePlugin({
-    name: "Auto Delete Messages",
+    name: "AutoDeleteMessages",
     description:
         "Auto delete messages after a certain time with guild or channel filter. If the message is edited or deleted before the time, it won't be deleted.",
     authors: [{ name: "diezou", id: 481850711072571393n }],
@@ -54,12 +54,21 @@ export default definePlugin({
     settings,
 
     start() {
-        this.preSend = addPreSendListener(async (_, message, extra) => {
+        this.onMessage = (e) => {
+            // Check if the message is from the current user, is optimistic, or is sending to get only the messages that are really sent by the current user and not just created
+            if (
+                !e.message ||
+                !e.message.author ||
+                e.message.author.id !== UserStore.getCurrentUser().id ||
+                e.optimistic ||
+                e.message.state === "SENDING"
+            )
+                return;
+
             // Get the delay from the settings
             const delaySettings = settings.store.secondsDelay
                 ? settings.store.secondsDelay * 1000
                 : 10000;
-
             // Parse settings to get the guild or channel IDs and their respective delays
             const parseSettings = (ids) =>
                 ids?.split(",").map((pair) => {
@@ -82,53 +91,41 @@ export default definePlugin({
 
             // Check if the message is from a guild or channel that is in the settings
             if (
-                !extra.channel.guild_id &&
-                !channelIds.includes(extra.channel.id)
+                !e.message.guild_id &&
+                !channelIds.includes(e.message.channel_id)
             )
                 return;
-            if (
-                extra.channel.guild_id &&
-                !guildIds.includes(extra.channel.guild_id)
-            )
+            if (e.message.guild_id && !guildIds.includes(e.message.guild_id))
                 return;
 
             // Determine the delay for the message
             // If the message is from a channel in a guild, use the channel delay if it exists, otherwise use the guild delay if it exists, otherwise use the default delay
             // If the message is from a channel not in a guild, use the channel delay if it exists, otherwise use the default delay
-            const delay = channelIds.includes(extra.channel.id)
+            const delay = channelIds.includes(e.message.channel_id)
                 ? channelSettings.find(
-                      (setting) => setting.id === extra.channel.id
+                      (setting) => setting.id === e.message.channel_id
                   )?.delay
-                : guildIds.includes(extra.channel.guild_id)
+                : guildIds.includes(e.message.guild_id)
                 ? guildSettings.find(
-                      (setting) => setting.id === extra.channel.guild_id
+                      (setting) => setting.id === e.message.guild_id
                   )?.delay
                 : delaySettings;
 
             // Delete the message after the delay
-            setTimeout(async () => {
-                // Because the event is called before the message is sent, we need to get the message again to have the id (a message not sent yet doesn't have an id)
-                const meId = UserStore.getCurrentUser().id;
-                const messages = await MessageStore.getMessages(
-                    extra.channel.id
+            setTimeout(() => {
+                MessageActions.deleteMessage(
+                    e.message.channel_id,
+                    e.message.id
                 );
-                const messageToDelete = messages._array.findLast(
-                    (msg) =>
-                        msg.author.id === meId &&
-                        msg.content === message.content
-                );
-
-                // If the message is not found, it means it was deleted before the delay or it was edited, so we don't need to delete it
-                if (messageToDelete) {
-                    MessageActions.deleteMessage(
-                        extra.channel.id,
-                        messageToDelete.id
-                    );
-                }
             }, delay);
-        });
+        };
+
+        // Subscribe to the message creation event
+        FluxDispatcher.subscribe("MESSAGE_CREATE", this.onMessage);
     },
+
     stop() {
-        removeClickListener(this.preSend);
+        // Unsubscribe from the message creation event
+        FluxDispatcher.unsubscribe("MESSAGE_CREATE", this.onMessage);
     },
 });
