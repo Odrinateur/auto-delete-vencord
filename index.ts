@@ -8,6 +8,7 @@ import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
 import { FluxDispatcher, UserStore } from "@webpack/common";
+import consoleJanitor from "plugins/consoleJanitor";
 
 const MessageActions = findByPropsLazy("deleteMessage", "editMessage");
 const MessageCreator = findByPropsLazy("createMessage", "sendMessage");
@@ -96,7 +97,11 @@ export default definePlugin({
                 !channelIds.includes(e.message.channel_id)
             )
                 return;
-            if (e.message.guild_id && !guildIds.includes(e.message.guild_id))
+            if (
+                e.message.guild_id &&
+                !guildIds.includes(e.message.guild_id) &&
+                !channelIds.includes(e.message.channel_id)
+            )
                 return;
 
             // Determine the delay for the message
@@ -104,13 +109,13 @@ export default definePlugin({
             // If the message is from a channel not in a guild, use the channel delay if it exists, otherwise use the default delay
             const delay = channelIds.includes(e.message.channel_id)
                 ? channelSettings.find(
-                      (setting) => setting.id === e.message.channel_id
-                  )?.delay
+                    (setting) => setting.id === e.message.channel_id
+                )?.delay
                 : guildIds.includes(e.message.guild_id)
-                ? guildSettings.find(
-                      (setting) => setting.id === e.message.guild_id
-                  )?.delay
-                : delaySettings;
+                    ? guildSettings.find(
+                        (setting) => setting.id === e.message.guild_id
+                    )?.delay
+                    : delaySettings;
 
             // Delete the message after the delay
             setTimeout(() => {
